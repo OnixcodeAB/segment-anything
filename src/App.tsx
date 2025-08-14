@@ -11,8 +11,8 @@ import { Stage } from "./components/Stage";
 
 // Define image, embedding and model paths
 
-const IMAGE_EMBEDDING = "../model/truck_embedding.npy";
 const MODEL_DIR = "../model/sam_onnx_example.onnx";
+const EMBEDDING_API_URL = "https://ba8dbe084edb.ngrok-free.app/embed"; // Your backend endpoint
 
 function App() {
   const {
@@ -36,6 +36,7 @@ function App() {
     const initializeModel = async () => {
       try {
         // Load the ONNX model
+        setIsLoading(true);
         const session = await ort.InferenceSession.create(MODEL_DIR);
         setModel(session);
         setIsLoading(false);
@@ -48,14 +49,7 @@ function App() {
     };
 
     initializeModel();
-    /*         const url = new URL(truck, location.origin);
-    //console.log("Loading image from:", url);
-    loadImage(url); */
-    // Load the Segment Anything pre-computed embedding
-    // from the Numpy file
-    Promise.resolve(loadNpyTensor(IMAGE_EMBEDDING, "float32")).then(
-      (embedding) => setTensor(embedding)
-    );
+
     //console.log("Image embedding loaded successfully");
   }, []);
 
@@ -72,18 +66,54 @@ function App() {
       setIsLoading(true);
       setError("");
 
-      // Load image
+      // First load the image
       await loadImage(imageUrl);
 
-      // Load embedding
-      /* const embedding = await loadNpyTensor(embeddingUrl, "float32");
-      setTensor(embedding); */
+      // Then fetch the embedding from the backend
+      await fetchEmbedding(imageUrl);
 
       setIsLoading(false);
     } catch (error) {
       console.error("Error loading resources:", error);
       setError("Failed to load image or embedding");
       setIsLoading(false);
+    }
+  };
+
+  // Fetch embedding from backend API
+  const fetchEmbedding = async (imageUrl: string) => {
+    try {
+      const formData = new FormData();
+      formData.append("image_url", imageUrl);
+      const response = await fetch(EMBEDDING_API_URL, {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      // Get the blob data from the response
+      const blob = await response.blob();
+
+      // Convert the to ArrayBuffer
+      const arrayBuffer = await blob.arrayBuffer();
+
+      // Create a temporary URL for the blob
+      const tempUrl = URL.createObjectURL(
+        new Blob([arrayBuffer], { type: "application/octet-stream" })
+      );
+
+      // Load the numpy tensor from the blob data
+      const embedding = await loadNpyTensor(tempUrl, "float32");
+
+      // Set the tensor state
+      setTensor(embedding as ort.Tensor);
+
+      // Clean up the temporary URL
+      URL.revokeObjectURL(tempUrl);
+      //console.log("Embedding loaded successfully", tensor);
+    } catch (error) {
+      throw error;
     }
   };
 
@@ -127,44 +157,39 @@ function App() {
 
   // Decode a Numpy file into a tensor.
   const loadNpyTensor = async (tensorFile: string, dType: any) => {
-    let npLoader = new npyjs();
-    const npArray = await npLoader.load(tensorFile);
-    const tensor = new ort.Tensor(dType, npArray.data, npArray.shape);
-    return tensor;
+    try {
+      let npLoader = new npyjs();
+      const npArray = await npLoader.load(tensorFile);
+      const tensor = new ort.Tensor(dType, npArray.data, npArray.shape);
+      return tensor;
+    } catch (error) {
+      console.error("Error loading numpy tensor:", error);
+      throw error;
+    }
   };
 
   // Run the ONNX model every time clicks has changed
   const runModel = async () => {
     try {
-      if (
-        model === null ||
-        clicks === null ||
-        tensor === null ||
-        modelScale === null
-      ) {
+      if (model === null || !clicks || !tensor || !modelScale) {
         console.warn("Model or clicks or modelScale is not ready");
         return;
       } else {
         const feeds = modelData({ clicks, tensor, modelScale });
-        if (feeds === undefined) {
+        if (!feeds) {
           console.warn("No input clicks provided");
           return;
         }
         const results = await model.run(feeds);
-        if (
-          results === undefined ||
-          results[model.outputNames[0]] === undefined
-        ) {
-          console.warn("Model did not return any results");
-          return;
-        }
-        //console.log("Model results:", results);
+
         // The output is an array of tensors, we assume the first one is the mask
         // and it is the only output of the model.
         // If the model has multiple outputs, you may need to adjust this.
-
-        const output = results[model.outputNames[0]]; // Get the output tensor
-        //console.log("Model output names:", output);
+        const output = results[model.outputNames[0]];
+        if (!output) {
+          console.warn("Model did not return any results");
+          return;
+        }
 
         // The predicted mask returned from the ONNX model is an array which is
         // rendered as an HTML image using onnxMaskToImage() from maskUtils.tsx.
@@ -181,11 +206,12 @@ function App() {
 
   return (
     <>
-      <div className="url-input-container">
+      <div className="p-5 mb-5">
         <div>
-          <label htmlFor="image-url">Image URL:</label>
+          <label htmlFor="image-url" className="p-2 w-30">Image URL:</label>
           <input
             id="image-url"
+            className="p-2 border-1 rounded-lg"
             type="text"
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
@@ -193,10 +219,15 @@ function App() {
           />
         </div>
 
-        <button className="p-2 border-1 mt-2 rounded-lg cursor-pointer" type="button" onClick={handleLoad} disabled={isLoading}>
-          {isLoading ? "Loading..." : ""} button
+        <button
+          className="p-2 border-1 mt-2 rounded-lg cursor-pointer bg-[#4CAF50] disabled:bg-gray-400 text-white"
+          type="button"
+          onClick={handleLoad}
+          disabled={isLoading}
+        >
+          {isLoading ? "Loading..." : "Process Image"} button
         </button>
-        {error && <div className="error-message">{error}</div>}
+        {error && <div className="text-red-400 mt-3">{error}</div>}
       </div>
 
       <Stage />
