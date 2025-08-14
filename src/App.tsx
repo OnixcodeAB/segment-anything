@@ -71,7 +71,6 @@ function App() {
 
       // Then fetch the embedding from the backend
       await fetchEmbedding(imageUrl);
-
       setIsLoading(false);
     } catch (error) {
       console.error("Error loading resources:", error);
