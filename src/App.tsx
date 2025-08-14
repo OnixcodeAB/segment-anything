@@ -9,10 +9,8 @@ import { modelData } from "./components/helpers/onnxModelAPI";
 import { onnxMaskToImage } from "./components/helpers/maskUtils";
 import { Stage } from "./components/Stage";
 
-import truck from "./assets/data/truck.jpg";
-
 // Define image, embedding and model paths
-//const IMAGE_PATH = "./assets/data/truck.jpg";
+
 const IMAGE_EMBEDDING = "../model/truck_embedding.npy";
 const MODEL_DIR = "../model/sam_onnx_example.onnx";
 
@@ -24,6 +22,9 @@ function App() {
   } = useContext(AppContext)!;
   const [model, setModel] = useState<ort.InferenceSession | null>(null);
   const [tensor, setTensor] = useState<ort.Tensor | null>(null); // Image embedding tensor
+  const [imageUrl, setImageUrl] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
 
   // The ONNX model expects the input to be rescaled to 1024.
   // The modelScale state variable keeps track of the scale values.
@@ -37,16 +38,19 @@ function App() {
         // Load the ONNX model
         const session = await ort.InferenceSession.create(MODEL_DIR);
         setModel(session);
+        setIsLoading(false);
         //console.log("Model loaded successfully");
       } catch (error) {
         console.error("Failed to load the model:", error);
+        setError("Failed to load the model");
+        setIsLoading(false);
       }
     };
 
     initializeModel();
-    const url = new URL(truck, location.origin);
+    /*         const url = new URL(truck, location.origin);
     //console.log("Loading image from:", url);
-    loadImage(url);
+    loadImage(url); */
     // Load the Segment Anything pre-computed embedding
     // from the Numpy file
     Promise.resolve(loadNpyTensor(IMAGE_EMBEDDING, "float32")).then(
@@ -57,8 +61,34 @@ function App() {
 
   //console.log({ model, clicks, tensor, modelScale, image, maskImg });
 
+  // Handle image and embedding loading when URLs change
+  const handleLoad = async () => {
+    if (!imageUrl) {
+      setError("Please provide both image URLs");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError("");
+
+      // Load image
+      await loadImage(imageUrl);
+
+      // Load embedding
+      /* const embedding = await loadNpyTensor(embeddingUrl, "float32");
+      setTensor(embedding); */
+
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error loading resources:", error);
+      setError("Failed to load image or embedding");
+      setIsLoading(false);
+    }
+  };
+
   // Load the image
-  const loadImage = async (url: URL) => {
+  const loadImage = async (url: string) => {
     try {
       const img = new Image();
       img.crossOrigin = "anonymous"; // Important if loading from different domains
@@ -75,12 +105,12 @@ function App() {
           };
 
           img.onerror = () => {
-            reject(new Error(`Failed to load image from ${url.href}`));
+            reject(new Error(`Failed to load image from ${url}`));
           };
         }
       );
 
-      img.src = url.href;
+      img.src = url;
 
       // Wait for the image to load and then update state
       const loadedImage = await imageLoadPromise;
@@ -151,6 +181,24 @@ function App() {
 
   return (
     <>
+      <div className="url-input-container">
+        <div>
+          <label htmlFor="image-url">Image URL:</label>
+          <input
+            id="image-url"
+            type="text"
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="Enter image URL"
+          />
+        </div>
+
+        <button className="p-2 border-1 mt-2 rounded-lg cursor-pointer" type="button" onClick={handleLoad} disabled={isLoading}>
+          {isLoading ? "Loading..." : ""} button
+        </button>
+        {error && <div className="error-message">{error}</div>}
+      </div>
+
       <Stage />
     </>
   );
