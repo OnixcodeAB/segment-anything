@@ -87,6 +87,11 @@ function App() {
       const response = await fetch(EMBEDDING_API_URL, {
         method: "POST",
         body: formData,
+        mode: "cors", // Ensure CORS is enabled if needed
+        headers: {
+          Accetp: "application/octet-stream", // Expecting binary data
+          "ngrok-skip-browser-warning": "true", // Skip browser warning for ngrok
+        }
       });
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
