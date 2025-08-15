@@ -5,6 +5,7 @@ export interface contextProps {
     clicks: modelInputProps[] | null,
     setClicks: (e: modelInputProps[] | null) => void
   ];
+  boxes: [boxInputProps[], React.Dispatch<React.SetStateAction<boxInputProps[]>>];
   image: [
     image: HTMLImageElement | null,
     setImage: (e: HTMLImageElement | null) => void
@@ -25,6 +26,14 @@ export interface modelInputProps {
   x: number;
   y: number;
   clickType: number;
+}
+
+export interface boxInputProps {
+  // Define the properties for boxInputProps as needed, for example:
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export interface modeDataProps {
