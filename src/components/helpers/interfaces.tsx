@@ -5,7 +5,10 @@ export interface contextProps {
     clicks: modelInputProps[] | null,
     setClicks: (e: modelInputProps[] | null) => void
   ];
-  boxes: [boxInputProps[], React.Dispatch<React.SetStateAction<boxInputProps[]>>];
+  boxes: [
+    boxes: boxInputProps[] | null,
+    setBoxes: (e: boxInputProps[] | null) => void
+  ];
   image: [
     image: HTMLImageElement | null,
     setImage: (e: HTMLImageElement | null) => void
@@ -44,4 +47,8 @@ export interface modeDataProps {
 
 export interface ToolProps {
   handleMouseMove: (e: any) => void;
+  isDrawing?: boolean;
+    startPos?: { x: number; y: number } | (() => { x: number; y: number });
+  currentPos?: { x: number; y: number } | (() => { x: number; y: number });
+  mode?: "hover" | "box";
 }

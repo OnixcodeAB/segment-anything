@@ -111,11 +111,13 @@ export const Stage = () => {
           onMouseUp={handleMouseUp}
         >
           <Tool
-            handleMouseMove={mode === "hover" ? handleMouseMove : undefined}
+            handleMouseMove={mode === "hover" ? handleMouseMove : () => {}}
             isDrawing={isDrawing}
             startPos={mode === "box" ? startPos : undefined}
             currentPos={
-              mode === "box" && isDrawing ? getScaledCoordinates : undefined
+              mode === "box" && isDrawing
+                ? startPos
+                : undefined
             }
             mode={mode}
           />
