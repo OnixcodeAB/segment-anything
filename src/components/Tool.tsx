@@ -47,24 +47,56 @@ export const Tool = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !boxCoords || !image || mode !== "box") {
-      const ctx = canvas?.getContext("2d");
-      ctx?.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas on mode change or no box
+    if (!canvas) {
       return;
     }
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      return;
+    }
+
+    // Set canvas dimensions based on image
+    if (image) {
+      canvas.width = image.width;
+      canvas.height = image.height;
+    } else {
+      // Handle the case where the image is not yet loaded
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      return;
+    }
+
+    // Draw the image and mask
+    ctx.drawImage(image, 0, 0, image.width, image.height);
+    if (maskImg) {
+      ctx.drawImage(maskImg, 0, 0, image.width, image.height);
+    }
+  }, [image, maskImg]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || mode !== "box") {
+      // Clear the canvas when switching out of box mode or no canvas exists
+      const ctx = canvas?.getContext("2d");
+      ctx?.clearRect(0, 0, canvas?.width || 0, canvas?.height || 0);
+      return;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Bounding box drawing logic remains the same
-    const { x, y, width, height } = boxCoords;
-    const scaleX = canvas.width / image.width;
-    const scaleY = canvas.height / image.height;
+    // Bounding box drawing logic
+    if (boxCoords && image) {
+      const { x, y, width, height } = boxCoords;
+      const scaleX = canvas.width / image.width;
+      const scaleY = canvas.height / image.height;
 
-    ctx.strokeStyle = "red";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x * scaleX, y * scaleY, width * scaleX, height * scaleY);
+      ctx.strokeStyle = "red";
+      ctx.lineWidth = 10;
+      ctx.strokeRect(x * scaleX, y * scaleY, width * scaleX, height * scaleY);
+    }
   }, [boxCoords, image, mode]);
 
   const imageClasses = "";
@@ -88,16 +120,18 @@ export const Tool = ({
               shouldFitToWidth ? "w-full" : "h-full"
             } ${imageClasses}`}
           ></img>
-          {mode === "box" && (
+          {
             <canvas
               ref={canvasRef}
-              className="absolute top-0 left-0 w-full h-full cursor-crosshair"
+              onMouseMove={
+                mode === "hover" ? handleMouseMove : handleBoxMouseMove
+              }
               onMouseDown={handleMouseDown}
               onMouseUp={handleMouseUp}
-              onMouseMove={handleBoxMouseMove}
               onMouseOut={handleMouseOut}
-            ></canvas>
-          )}
+              className="absolute top-0 left-0 w-full h-full cursor-pointer"
+            />
+          }
         </div>
       )}
       {maskImg && (
