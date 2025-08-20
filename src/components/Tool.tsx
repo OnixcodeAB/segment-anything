@@ -47,18 +47,23 @@ export const Tool = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !boxCoords || !image || mode !== 'box') return;
+    if (!canvas || !boxCoords || !image || mode !== "box") {
+      const ctx = canvas?.getContext("2d");
+      ctx?.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas on mode change or no box
+      return;
+    }
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Bounding box drawing logic remains the same
     const { x, y, width, height } = boxCoords;
     const scaleX = canvas.width / image.width;
     const scaleY = canvas.height / image.height;
 
     ctx.strokeStyle = "red";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1;
     ctx.strokeRect(x * scaleX, y * scaleY, width * scaleX, height * scaleY);
   }, [boxCoords, image, mode]);
 
@@ -71,13 +76,19 @@ export const Tool = ({
         <div className={`relative ${shouldFitToWidth ? "w-full" : "h-full"}`}>
           <img
             aria-label="input image"
-            onMouseMove={mode === 'hover' ? handleMouseMove : undefined}
-            onMouseOut={mode === 'hover' ? () => _.defer(() => setMaskImg(null)) : undefined}
-            onTouchStart={mode === 'hover' ? handleMouseMove : undefined}
+            onMouseMove={mode === "hover" ? handleMouseMove : undefined}
+            onMouseOut={
+              mode === "hover"
+                ? () => _.defer(() => setMaskImg(null))
+                : undefined
+            }
+            onTouchStart={mode === "hover" ? handleMouseMove : undefined}
             src={image.src}
-            className={`${shouldFitToWidth ? "w-full" : "h-full"} ${imageClasses}`}
+            className={`${
+              shouldFitToWidth ? "w-full" : "h-full"
+            } ${imageClasses}`}
           ></img>
-          {mode === 'box' && (
+          {mode === "box" && (
             <canvas
               ref={canvasRef}
               className="absolute top-0 left-0 w-full h-full cursor-crosshair"
@@ -93,7 +104,9 @@ export const Tool = ({
         <img
           aria-label="segmentation mask"
           src={maskImg.src}
-          className={`${shouldFitToWidth ? "w-full" : "h-full"} ${maskImageClasses}`}
+          className={`${
+            shouldFitToWidth ? "w-full" : "h-full"
+          } ${maskImageClasses}`}
         ></img>
       )}
     </>

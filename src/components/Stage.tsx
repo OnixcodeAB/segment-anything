@@ -1,6 +1,10 @@
 import { useContext, useState } from "react";
 import * as _ from "underscore";
-import type { modelInputProps, ToolProps, boxInputProps } from "./helpers/interfaces";
+import type {
+  modelInputProps,
+  ToolProps,
+  boxInputProps,
+} from "./helpers/interfaces";
 import AppContext from "./hooks/context";
 import { Tool } from "./Tool";
 
@@ -14,6 +18,9 @@ export const Stage = () => {
   const [mode, setMode] = useState<ToolProps["mode"]>("hover"); // 'hover' or 'box'
   const [isDrawing, setIsDrawing] = useState(false);
   const [startCoords, setStartCoords] = useState<number[] | null>(null);
+  const [drawBoxCoords, setDrawBoxCoords] = useState<boxInputProps | null>(
+    null
+  ); // New state for drawing
 
   const getClick = (
     x: number,
@@ -47,6 +54,8 @@ export const Stage = () => {
 
   const handleMouseDown = (e: any) => {
     if (mode !== "box") return;
+    setBox(null); // Reset box when starting a new draw
+    setClicks([]); // Clear previous clicks
     const { x, y } = scaleCoordinates(
       e.clientX,
       e.clientY,
@@ -63,20 +72,17 @@ export const Stage = () => {
       e.clientY,
       e.nativeEvent.target
     );
-    
+
     // Calculate width and height
     const newBox: boxInputProps = {
       x: Math.min(startCoords![0], x),
       y: Math.min(startCoords![1], y),
       width: Math.abs(x - startCoords![0]),
-      height: Math.abs(y - startCoords![1])
+      height: Math.abs(y - startCoords![1]),
     };
-    
+
     setBox(newBox);
-    setClicks([
-      { x: newBox.x, y: newBox.y, clickType: 2 },
-      { x: newBox.x + newBox.width, y: newBox.y + newBox.height, clickType: 2 },
-    ]);
+    setDrawBoxCoords(null); // Clear the local drawing state
     setIsDrawing(false);
     setStartCoords(null);
   };
@@ -93,15 +99,15 @@ export const Stage = () => {
       e.clientY,
       e.nativeEvent.target
     );
-    
-    const newBox: boxInputProps = {
+
+    // Update local state for visual feedback
+    const tempBox: boxInputProps = {
       x: startCoords![0],
       y: startCoords![1],
       width: x - startCoords![0],
-      height: y - startCoords![1]
+      height: y - startCoords![1],
     };
-    
-    setBox(newBox);
+    setDrawBoxCoords(tempBox);
   };
 
   const flexCenterClasses = "flex items-center justify-center";
@@ -110,6 +116,7 @@ export const Stage = () => {
     <div className={`${flexCenterClasses} w-full h-full`}>
       <div className="absolute top-4 left-4 z-10 flex space-x-2">
         <button
+          type="button"
           onClick={() => {
             setMode("hover");
             setBox(null);
@@ -121,6 +128,7 @@ export const Stage = () => {
           Hover Mode
         </button>
         <button
+          type="button"
           onClick={() => {
             setMode("box");
             setBox(null);
@@ -140,7 +148,7 @@ export const Stage = () => {
           handleMouseUp={handleMouseUp}
           handleMouseOut={handleMouseOut}
           handleBoxMouseMove={handleBoxMouseMove}
-          boxCoords={box}
+          boxCoords={drawBoxCoords}
         />
       </div>
     </div>
