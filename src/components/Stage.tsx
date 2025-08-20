@@ -1,127 +1,147 @@
 import { useContext, useState } from "react";
 import * as _ from "underscore";
-import type { modelInputProps, boxInputProps } from "./helpers/interfaces";
+import type { modelInputProps, ToolProps, boxInputProps } from "./helpers/interfaces";
 import AppContext from "./hooks/context";
 import { Tool } from "./Tool";
-
-type InteractionMode = "hover" | "box";
 
 export const Stage = () => {
   const {
     clicks: [, setClicks],
-    boxes: [, setBoxes],
+    box: [box, setBox],
     image: [image],
   } = useContext(AppContext)!;
 
+  const [mode, setMode] = useState<ToolProps["mode"]>("hover"); // 'hover' or 'box'
   const [isDrawing, setIsDrawing] = useState(false);
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-  const [mode, setMode] = useState<InteractionMode>("hover");
+  const [startCoords, setStartCoords] = useState<number[] | null>(null);
 
-  const getClick = (x: number, y: number): modelInputProps => {
-    const clickType = 1; // 1 for positive, 0 for negative
+  const getClick = (
+    x: number,
+    y: number,
+    clickType: number
+  ): modelInputProps => {
     return { x, y, clickType };
   };
 
-  const getBox = (
-    x: number,
-    y: number,
-    width: number,
-    height: number
-  ): boxInputProps => {
-    return { x, y, width, height };
-  };
-
-  const getScaledCoordinates = (e: any) => {
-    let el = e.nativeEvent.target;
+  const scaleCoordinates = (x: number, y: number, el: any) => {
     const rect = el.getBoundingClientRect();
-    let x = e.clientX - rect.left;
-    let y = e.clientY - rect.top;
-
     const imageScale = image ? image.width / el.offsetWidth : 1;
     return {
-      x: x * imageScale,
-      y: y * imageScale,
+      x: (x - rect.left) * imageScale,
+      y: (y - rect.top) * imageScale,
     };
-  };
-
-  const handleMouseDown = (e: any) => {
-    if (mode !== "box") return;
-
-    const { x, y } = getScaledCoordinates(e);
-    setIsDrawing(true);
-    setStartPos({ x, y });
-  };
-
-  const handleMouseUp = (e: any) => {
-    if (mode !== "box" || !isDrawing) return;
-
-    const { x, y } = getScaledCoordinates(e);
-
-    const width = Math.abs(x - startPos.x);
-    const height = Math.abs(y - startPos.y);
-    const minX = Math.min(x, startPos.x);
-    const minY = Math.min(y, startPos.y);
-
-    const box = getBox(minX, minY, width, height);
-    setBoxes([box]);
-    setIsDrawing(false);
   };
 
   const handleMouseMove = _.throttle((e: any) => {
     if (mode !== "hover") return;
-
-    const { x, y } = getScaledCoordinates(e);
-    const click = getClick(x, y);
+    const { x, y } = scaleCoordinates(
+      e.clientX,
+      e.clientY,
+      e.nativeEvent.target
+    );
+    const click = getClick(x, y, 1);
     if (click) {
       setClicks([click]);
     }
   }, 15);
 
+  const handleMouseDown = (e: any) => {
+    if (mode !== "box") return;
+    const { x, y } = scaleCoordinates(
+      e.clientX,
+      e.clientY,
+      e.nativeEvent.target
+    );
+    setStartCoords([x, y]);
+    setIsDrawing(true);
+  };
+
+  const handleMouseUp = (e: any) => {
+    if (!isDrawing || mode !== "box") return;
+    const { x, y } = scaleCoordinates(
+      e.clientX,
+      e.clientY,
+      e.nativeEvent.target
+    );
+    
+    // Calculate width and height
+    const newBox: boxInputProps = {
+      x: Math.min(startCoords![0], x),
+      y: Math.min(startCoords![1], y),
+      width: Math.abs(x - startCoords![0]),
+      height: Math.abs(y - startCoords![1])
+    };
+    
+    setBox(newBox);
+    setClicks([
+      { x: newBox.x, y: newBox.y, clickType: 2 },
+      { x: newBox.x + newBox.width, y: newBox.y + newBox.height, clickType: 2 },
+    ]);
+    setIsDrawing(false);
+    setStartCoords(null);
+  };
+
+  const handleMouseOut = () => {
+    if (isDrawing || mode !== "hover") return;
+    setClicks([]);
+  };
+
+  const handleBoxMouseMove = (e: any) => {
+    if (!isDrawing || mode !== "box") return;
+    const { x, y } = scaleCoordinates(
+      e.clientX,
+      e.clientY,
+      e.nativeEvent.target
+    );
+    
+    const newBox: boxInputProps = {
+      x: startCoords![0],
+      y: startCoords![1],
+      width: x - startCoords![0],
+      height: y - startCoords![1]
+    };
+    
+    setBox(newBox);
+  };
+
   const flexCenterClasses = "flex items-center justify-center";
 
   return (
-    <div className={`${flexCenterClasses} w-full h-full flex-col`}>
-      {/* Mode selection buttons */}
-      <div className="flex gap-2 mb-4">
+    <div className={`${flexCenterClasses} w-full h-full`}>
+      <div className="absolute top-4 left-4 z-10 flex space-x-2">
         <button
-          type="button"
-          className={`px-4 py-2 rounded-md ${
+          onClick={() => {
+            setMode("hover");
+            setBox(null);
+          }}
+          className={`px-4 py-2 rounded ${
             mode === "hover" ? "bg-blue-500 text-white" : "bg-gray-200"
           }`}
-          onClick={() => setMode("hover")}
         >
           Hover Mode
         </button>
         <button
-          type="button"
-          className={`px-4 py-2 rounded-md ${
+          onClick={() => {
+            setMode("box");
+            setBox(null);
+          }}
+          className={`px-4 py-2 rounded ${
             mode === "box" ? "bg-blue-500 text-white" : "bg-gray-200"
           }`}
-          onClick={() => setMode("box")}
         >
-          Box Draw Mode
+          Box Mode
         </button>
       </div>
-
-      {/* Tool container */}
-      <div className={`${flexCenterClasses} w-full h-[calc(100%-3rem)]`}>
-        <div
-          className={`${flexCenterClasses} relative w-[90%] h-[90%]`}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-        >
-          <Tool
-            handleMouseMove={mode === "hover" ? handleMouseMove : () => {}}
-            isDrawing={isDrawing}
-            startPos={mode === "box" ? startPos : undefined}
-            currentPos={
-              mode === "box" && isDrawing
-                ? startPos
-                : undefined
-            }
-            mode={mode}
-          />
-        </div>
+      <div className={`${flexCenterClasses} relative w-[90%] h-[90%]`}>
+        <Tool
+          mode={mode}
+          handleMouseMove={handleMouseMove}
+          handleMouseDown={handleMouseDown}
+          handleMouseUp={handleMouseUp}
+          handleMouseOut={handleMouseOut}
+          handleBoxMouseMove={handleBoxMouseMove}
+          boxCoords={box}
+        />
       </div>
     </div>
   );

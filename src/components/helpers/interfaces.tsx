@@ -5,10 +5,8 @@ export interface contextProps {
     clicks: modelInputProps[] | null,
     setClicks: (e: modelInputProps[] | null) => void
   ];
-  boxes: [
-    boxes: boxInputProps[] | null,
-    setBoxes: (e: boxInputProps[] | null) => void
-  ];
+  box: [box: boxInputProps | null, setBoxes: (e: boxInputProps | null) => void];
+  mode: [mode: modeProps, setMode: (e: modeProps) => void];
   image: [
     image: HTMLImageElement | null,
     setImage: (e: HTMLImageElement | null) => void
@@ -41,14 +39,21 @@ export interface boxInputProps {
 
 export interface modeDataProps {
   clicks?: Array<modelInputProps>;
+  box?: boxInputProps | null;
   tensor: ort.Tensor;
   modelScale: modelScaleProps;
 }
 
+export interface modeProps {
+  mode: "hover" | "box";
+}
+
 export interface ToolProps {
-  handleMouseMove: (e: any) => void;
-  isDrawing?: boolean;
-    startPos?: { x: number; y: number } | (() => { x: number; y: number });
-  currentPos?: { x: number; y: number } | (() => { x: number; y: number });
-  mode?: "hover" | "box";
+  mode: modeProps["mode"];
+  handleMouseMove?: (e: any) => void;
+  handleMouseDown?: (e: any) => void;
+  handleMouseUp?: (e: any) => void;
+  handleMouseOut?: (e: any) => void;
+  handleBoxMouseMove?: (e: any) => void;
+  boxCoords?: boxInputProps | null;
 }

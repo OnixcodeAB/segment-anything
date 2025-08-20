@@ -3,36 +3,30 @@ import * as _ from "underscore";
 import AppContext from "./hooks/context";
 import type { ToolProps } from "./helpers/interfaces";
 
-export const Tool = ({ 
-  handleMouseMove, 
-  isDrawing, 
-  startPos, 
-  currentPos,
-  mode 
+export const Tool = ({
+  mode,
+  handleMouseMove,
+  handleMouseDown,
+  handleMouseUp,
+  handleMouseOut,
+  handleBoxMouseMove,
+  boxCoords,
 }: ToolProps) => {
   const {
     image: [image],
     maskImg: [maskImg, setMaskImg],
   } = useContext(AppContext)!;
 
-  const imageRef = useRef<HTMLImageElement>(null);
-  const [shouldFitToWidth, setShouldFitToWidth] = useState(true);
-  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
-  const [scaleFactor, setScaleFactor] = useState(1);
-  const bodyEl = document.body;
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Calculate scaling factor based on image display size vs natural size
-  const calculateScale = () => {
-    if (!imageRef.current || !image) return 1;
-    return imageRef.current.clientWidth / image.width;
-  };
+  const [shouldFitToWidth, setShouldFitToWidth] = useState(true);
+  const bodyEl = document.body;
 
   const fitToPage = () => {
     if (!image) return;
     const imageAspectRatio = image.width / image.height;
     const screenAspectRatio = window.innerWidth / window.innerHeight;
     setShouldFitToWidth(imageAspectRatio > screenAspectRatio);
-    setScaleFactor(calculateScale());
   };
 
   const resizeObserver = new ResizeObserver((entries) => {
@@ -51,96 +45,56 @@ export const Tool = ({
     };
   }, [image]);
 
-  const handleMousePosition = (e: React.MouseEvent) => {
-    if (!image) return;
-    
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    setCursorPos({ x, y });
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !boxCoords || !image || mode !== 'box') return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    if (handleMouseMove) {
-      handleMouseMove(e);
-    }
-  };
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Convert scaled coordinates to display coordinates
-  const getDisplayBoxDimensions = () => {
-    if (!isDrawing || !startPos || !currentPos || !imageRef.current) return null;
-    
-    const start = typeof startPos === "function" ? startPos() : startPos;
-    if (!start) return null;
-    const { x: startX, y: startY } = start;
-    const current = typeof currentPos === "function" ? currentPos() : currentPos;
-    if (!current) return null;
-    const { x: endX, y: endY } = current;
-    
-    // Apply the inverse scale to convert from image coordinates to display coordinates
-    const scale = calculateScale();
-    
-    return {
-      left: Math.min(startX, endX) * scale,
-      top: Math.min(startY, endY) * scale,
-      width: Math.abs(endX - startX) * scale,
-      height: Math.abs(endY - startY) * scale,
-    };
-  };
+    const { x, y, width, height } = boxCoords;
+    const scaleX = canvas.width / image.width;
+    const scaleY = canvas.height / image.height;
 
-  const boxDimensions = getDisplayBoxDimensions();
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x * scaleX, y * scaleY, width * scaleX, height * scaleY);
+  }, [boxCoords, image, mode]);
+
   const imageClasses = "";
   const maskImageClasses = "absolute opacity-40 pointer-events-none";
-  const boxPreviewClasses = "absolute border-2 border-blue-500 bg-blue-500 bg-opacity-20 pointer-events-none";
 
   return (
     <>
       {image && (
-        <div className="relative w-full h-full">
+        <div className={`relative ${shouldFitToWidth ? "w-full" : "h-full"}`}>
           <img
-            ref={imageRef}
             aria-label="input image"
-            onMouseMove={handleMousePosition}
-            onMouseOut={() => _.defer(() => setMaskImg(null))}
-            onTouchStart={handleMouseMove}
+            onMouseMove={mode === 'hover' ? handleMouseMove : undefined}
+            onMouseOut={mode === 'hover' ? () => _.defer(() => setMaskImg(null)) : undefined}
+            onTouchStart={mode === 'hover' ? handleMouseMove : undefined}
             src={image.src}
-            className={`${
-              shouldFitToWidth ? "w-full" : "h-full"
-            } ${imageClasses} ${mode === 'hover' ? 'cursor-crosshair' : 'cursor-default'}`}
-          />
-          
-          {/* Box drawing preview - positioned exactly over the image */}
-          {mode === 'box' && isDrawing && boxDimensions && (
-            <div
-              className={boxPreviewClasses}
-              style={{
-                left: `${boxDimensions.left}px`,
-                top: `${boxDimensions.top}px`,
-                width: `${boxDimensions.width}px`,
-                height: `${boxDimensions.height}px`,
-              }}
-            />
-          )}
-
-          {/* Current cursor position indicator */}
-          {mode === 'hover' && (
-            <div
-              className="absolute w-2 h-2 bg-red-500 rounded-full pointer-events-none transform -translate-x-1 -translate-y-1"
-              style={{
-                left: `${cursorPos.x}px`,
-                top: `${cursorPos.y}px`,
-              }}
-            />
+            className={`${shouldFitToWidth ? "w-full" : "h-full"} ${imageClasses}`}
+          ></img>
+          {mode === 'box' && (
+            <canvas
+              ref={canvasRef}
+              className="absolute top-0 left-0 w-full h-full cursor-crosshair"
+              onMouseDown={handleMouseDown}
+              onMouseUp={handleMouseUp}
+              onMouseMove={handleBoxMouseMove}
+              onMouseOut={handleMouseOut}
+            ></canvas>
           )}
         </div>
       )}
-      
       {maskImg && (
         <img
           aria-label="segmentation mask"
           src={maskImg.src}
-          className={`${
-            shouldFitToWidth ? "w-full" : "h-full"
-          } ${maskImageClasses}`}
-        />
+          className={`${shouldFitToWidth ? "w-full" : "h-full"} ${maskImageClasses}`}
+        ></img>
       )}
     </>
   );

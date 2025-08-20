@@ -12,13 +12,15 @@ import { Stage } from "./components/Stage";
 // Define image, embedding and model paths
 
 const MODEL_DIR = "../model/sam_onnx_example.onnx";
-const EMBEDDING_API_URL = "https://ba8dbe084edb.ngrok-free.app/embed"; // Your backend endpoint
+const EMBEDDING_API_URL = "https://4a065b0627e2.ngrok-free.app/embed"; // Your backend endpoint
 
 function App() {
   const {
     clicks: [clicks],
+    box: [box],
     image: [, setImage],
     maskImg: [, setMaskImg],
+    mode: [mode],
   } = useContext(AppContext)!;
   const [model, setModel] = useState<ort.InferenceSession | null>(null);
   const [tensor, setTensor] = useState<ort.Tensor | null>(null); // Image embedding tensor
@@ -87,12 +89,13 @@ function App() {
       const response = await fetch(EMBEDDING_API_URL, {
         method: "POST",
         body: formData,
-        mode: "cors", // Ensure CORS is enabled if needed
+        mode: "cors", // Explicitly set CORS mode
         headers: {
-          Accetp: "application/octet-stream", // Expecting binary data
-          "ngrok-skip-browser-warning": "true", // Skip browser warning for ngrok
-        }
+          Accept: "application/octet-stream",
+          "ngrok-skip-browser-warning": "true", // Add this if using ngrok
+        },
       });
+      console.log(response);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -117,6 +120,7 @@ function App() {
       URL.revokeObjectURL(tempUrl);
       //console.log("Embedding loaded successfully", tensor);
     } catch (error) {
+      console.log(error);
       throw error;
     }
   };
@@ -172,47 +176,55 @@ function App() {
     }
   };
 
-  // Run the ONNX model every time clicks has changed
   const runModel = async () => {
     try {
-      if (model === null || !clicks || !tensor || !modelScale) {
-        console.warn("Model or clicks or modelScale is not ready");
+      if (model === null || !tensor || !modelScale) {
+        console.warn("Model or tensor or modelScale is not ready");
         return;
-      } else {
-        const feeds = modelData({ clicks, tensor, modelScale });
-        if (!feeds) {
-          console.warn("No input clicks provided");
-          return;
-        }
-        const results = await model.run(feeds);
-
-        // The output is an array of tensors, we assume the first one is the mask
-        // and it is the only output of the model.
-        // If the model has multiple outputs, you may need to adjust this.
-        const output = results[model.outputNames[0]];
-        if (!output) {
-          console.warn("Model did not return any results");
-          return;
-        }
-
-        // The predicted mask returned from the ONNX model is an array which is
-        // rendered as an HTML image using onnxMaskToImage() from maskUtils.tsx.
-        setMaskImg(
-          onnxMaskToImage(output.data, output.dims[2], output.dims[3])
-        );
       }
-    } catch (error) {}
+
+      let feeds;
+      if (mode.mode === "box" && box) {
+        feeds = modelData({ box, tensor, modelScale });
+      } else if (mode.mode === "hover" && clicks) {
+        feeds = modelData({ clicks, tensor, modelScale });
+      } else {
+        // If neither clicks nor a box is available for the current mode, do nothing.
+        console.warn("No input for current mode provided");
+        return;
+      }
+
+      if (!feeds) {
+        console.warn("No feeds generated for the model");
+        return;
+      }
+
+      const results = await model.run(feeds);
+
+      const output = results[model.outputNames[0]];
+      if (!output) {
+        console.warn("Model did not return any results");
+        return;
+      }
+
+      setMaskImg(onnxMaskToImage(output.data, output.dims[2], output.dims[3]));
+    } catch (error) {
+      console.error("Error running model:", error);
+      // Handle the error appropriately, e.g., display a user-friendly message
+    }
   };
 
   useEffect(() => {
     runModel();
-  }, [clicks]);
+  }, [clicks, box]); // Now the model runs when either clicks or box change
 
   return (
     <>
       <div className="p-5 mb-5">
         <div>
-          <label htmlFor="image-url" className="p-2 w-30">Image URL:</label>
+          <label htmlFor="image-url" className="p-2 w-30">
+            Image URL:
+          </label>
           <input
             id="image-url"
             className="p-2 border-1 rounded-lg"
