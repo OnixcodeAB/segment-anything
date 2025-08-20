@@ -1,21 +1,17 @@
 import { useContext, useState } from "react";
 import * as _ from "underscore";
-import type {
-  modelInputProps,
-  ToolProps,
-  boxInputProps,
-} from "./helpers/interfaces";
+import type { modelInputProps, boxInputProps } from "./helpers/interfaces";
 import AppContext from "./hooks/context";
 import { Tool } from "./Tool";
 
 export const Stage = () => {
   const {
     clicks: [, setClicks],
-    box: [box, setBox],
+    box: [, setBox],
+    mode: [mode, setMode],
     image: [image],
   } = useContext(AppContext)!;
 
-  const [mode, setMode] = useState<ToolProps["mode"]>("hover"); // 'hover' or 'box'
   const [isDrawing, setIsDrawing] = useState(false);
   const [startCoords, setStartCoords] = useState<number[] | null>(null);
   const [drawBoxCoords, setDrawBoxCoords] = useState<boxInputProps | null>(
@@ -40,7 +36,7 @@ export const Stage = () => {
   };
 
   const handleMouseMove = _.throttle((e: any) => {
-    if (mode !== "hover") return;
+    if (mode.mode !== "hover") return;
     const { x, y } = scaleCoordinates(
       e.clientX,
       e.clientY,
@@ -53,7 +49,7 @@ export const Stage = () => {
   }, 15);
 
   const handleMouseDown = (e: any) => {
-    if (mode !== "box") return;
+    if (mode.mode !== "box") return;
     setBox(null); // Reset box when starting a new draw
     setClicks([]); // Clear previous clicks
     const { x, y } = scaleCoordinates(
@@ -66,7 +62,7 @@ export const Stage = () => {
   };
 
   const handleMouseUp = (e: any) => {
-    if (!isDrawing || mode !== "box") return;
+    if (!isDrawing || mode.mode !== "box") return;
     const { x, y } = scaleCoordinates(
       e.clientX,
       e.clientY,
@@ -88,12 +84,12 @@ export const Stage = () => {
   };
 
   const handleMouseOut = () => {
-    if (isDrawing || mode !== "hover") return;
+    if (isDrawing || mode.mode !== "hover") return;
     setClicks([]);
   };
 
   const handleBoxMouseMove = (e: any) => {
-    if (!isDrawing || mode !== "box") return;
+    if (!isDrawing || mode.mode !== "box") return;
     const { x, y } = scaleCoordinates(
       e.clientX,
       e.clientY,
@@ -118,11 +114,11 @@ export const Stage = () => {
         <button
           type="button"
           onClick={() => {
-            setMode("hover");
+            setMode({ mode: "hover" });
             setBox(null);
           }}
           className={`px-4 py-2 rounded ${
-            mode === "hover" ? "bg-blue-500 text-white" : "bg-gray-200"
+            mode.mode === "hover" ? "bg-blue-500 text-white" : "bg-gray-200"
           }`}
         >
           Hover Mode
@@ -130,11 +126,11 @@ export const Stage = () => {
         <button
           type="button"
           onClick={() => {
-            setMode("box");
+            setMode({ mode: "box" });
             setBox(null);
           }}
           className={`px-4 py-2 rounded ${
-            mode === "box" ? "bg-blue-500 text-white" : "bg-gray-200"
+            mode.mode === "box" ? "bg-blue-500 text-white" : "bg-gray-200"
           }`}
         >
           Box Mode
@@ -142,7 +138,7 @@ export const Stage = () => {
       </div>
       <div className={`${flexCenterClasses} relative w-[90%] h-[90%]`}>
         <Tool
-          mode={mode}
+          mode={mode.mode}
           handleMouseMove={handleMouseMove}
           handleMouseDown={handleMouseDown}
           handleMouseUp={handleMouseUp}
